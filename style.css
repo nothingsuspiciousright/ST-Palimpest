@@ -121,6 +121,7 @@ label[for="palimpest_frozen"] input {
 #palimpest_settings #palimpest_force_summarize,
 #palimpest_settings #palimpest_stop,
 #palimpest_settings #palimpest_continue,
+#palimpest_settings #palimpest_continue_current,
 #palimpest_settings #palimpest_cancel_job { grid-column: 1; }
 #palimpest_settings #palimpest_export { grid-column: 2; grid-row: 1; }
 #palimpest_settings #palimpest_force_summarize,

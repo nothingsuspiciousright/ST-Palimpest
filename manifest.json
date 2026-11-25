@@ -6,5 +6,5 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Palimpest contributors; based on SillyTavern Summarize (Cohee)",
-  "version": "1.0.4"
+  "version": "1.0.5"
 }

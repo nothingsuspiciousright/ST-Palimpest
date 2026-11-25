@@ -4,7 +4,7 @@
 
 A standalone, manual Memory Book manager for SillyTavern. Generate, review, preserve, and continue long-form summaries without mixing the roleplay preset into the summarization request.
 
-**Version:** 1.0.4 · **License:** [AGPL-3.0](LICENSE) · [Русская документация](README.ru.md) · [Changelog](CHANGELOG.md)
+**Version:** 1.0.5 · **License:** [AGPL-3.0](LICENSE) · [Русская документация](README.ru.md) · [Changelog](CHANGELOG.md)
 
 ## Features
 
@@ -45,6 +45,8 @@ Use **Test** to send a small connectivity check without chat history. Select the
 4. **Stop & keep draft** cancels the request and keeps received text. Streaming checkpoints are saved roughly every 12 seconds as data arrives. Text never received or not yet saved before an unexpected tab closure cannot be recovered.
 5. Review the full draft and click **Apply** when satisfied. Use **Save draft edits** to persist manual draft edits. Discarding a draft closes the current job but keeps archived revisions.
 
+**Continue current Memory Book** resumes an already applied or manually imported book as a separate draft. If the exact applied revision has a saved source snapshot, the original skeleton and sources are reused. Otherwise confirm rebuilding from the current chat and Summary Prompt. Finish or discard any existing pending draft first. The active book remains unchanged until Apply.
+
 Avoid switching chats while generating. A switch cancels the request; only already saved checkpoints are guaranteed to remain. If the chat changes before applying a draft, Palimpest requests confirmation. Non-streaming providers cannot offer incremental recovery. Long histories and continuation drafts still count toward the provider's context limit; there is no automatic truncation or chunking. Native ST streaming may not expose usage or a finish reason, so `unknown` is normal for that path.
 
 ## Context and memory injection
@@ -64,9 +66,9 @@ Injection position, template, role, depth, and optional World Info scanning are 
 
 ## Backups and privacy
 
-**History** lists saved versions. **Backup now** snapshots the active book; restoring a revision creates a new active revision rather than erasing the previous version. Export a selected version to TXT or the version archive to JSON. JSON exports do not include the unfinished job's source snapshot, and JSON re-import is not implemented in this release. Keep regular full chat backups in addition to these exports.
+**History** lists saved versions. **Backup now** snapshots the active book; restoring a revision creates a new active revision rather than erasing the previous version. Export a selected version to TXT or the version archive to JSON. JSON exports omit both unfinished and last-applied source snapshots, and JSON re-import is not implemented in this release. Keep regular full chat backups in addition to these exports.
 
-Archives and temporary generation snapshots are stored in chat metadata. They increase chat file size and are lost if the chat is deleted without a backup. They can contain private narrative data. Do not publish chat exports or memory archives when reporting issues.
+Archives, pending generation snapshots and the latest applied source snapshot are stored in chat metadata. The last-applied snapshot is retained only for the matching active revision and replaced or cleared when the active book changes. They increase chat file size and are lost if the chat is deleted without a backup. They can contain private narrative data. Do not publish chat exports or memory archives when reporting issues.
 
 Micro-preset keys are session-only by default. **Remember key in this browser** stores a key in browser `localStorage` **without encryption**. Keys are not placed in the Memory Book archive by the extension. However, user-authored text can itself contain sensitive information. The configured ST server and selected API provider receive the relevant request and may retain logs; use trusted infrastructure and do not expose actual keys, endpoint URLs, or chat contents in bug reports. No dedicated analytics or telemetry is implemented by Palimpest.
 

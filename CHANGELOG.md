@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5 — Continue active memory
+
+- Continue an already applied Memory Book without modifying its existing text or replacing the active revision.
+- Retain the latest applied source snapshot and original summary skeleton for exact-context continuation. Older books can use the current chat and prompt after confirmation.
+- Save continuation output as a separate draft with existing checkpoint protection. Source snapshots are omitted from history JSON exports.
+
 ## 1.0.4 — Local token estimates
 
 - Show approximate text tokens alongside word and character counts for active memory, live and saved drafts, and archived versions.

@@ -126,6 +126,7 @@ function refreshModernUI() {
     $('#palimpest_current_stats').text(`${textStats(current)}${currentDirty ? ' · unsaved edits' : ''}`);
     $('#palimpest_force_summarize').prop('disabled', modernBusy || inApiCall || currentDirty || !!draft || !!archive?.job);
     $('#palimpest_continue').toggle(!!draft || !!archive?.job).prop('disabled',modernBusy || currentDirty);
+    $('#palimpest_continue_current').toggle(!!activeText(context).trim()).prop('disabled',modernBusy || inApiCall || currentDirty || !!draft || !!archive?.job);
     $('#palimpest_stop').toggle(modernBusy && !!controller);
     $('#palimpest_cancel_job').toggle(!!archive?.job && !draft).prop('disabled',modernBusy);
     $('#palimpest_prompt, #palimpest_prompt_restore, #palimpest_native_max').prop('disabled',modernBusy);
@@ -330,33 +331,46 @@ async function requestSelected(messages,signal,onProgress){const sel=String(exte
  let text='',finishReason='unknown';try{for await(const chunk of factory()){if(typeof chunk.text==='string'){text=chunk.text;await onProgress(text);}}if(signal.aborted)finishReason='cancelled';}catch(e){if(!text)throw e;finishReason=signal.aborted?'cancelled':'interrupted';}return {text,finishReason,usage:{},profile:p.name,model:p.model};}
 async function generateModernDraft(){return runDraft(false);}
 async function continueDraft(){return runDraft(true);}
-async function runDraft(resume){
+// Keep only the latest applied source snapshot, bound to its exact active revision.
+function appliedSource(a){const saved=a?.appliedSource;return saved?.revisionId===a?.activeId && saved?.snapshot?.messages?.length ? saved : null;}
+async function continueCurrent(){return runDraft(true,true);}
+async function runDraft(resume,fromActive=false){
  if(modernBusy||inApiCall||currentDirty)return '';const c=getContext(),a=archiveFor(c,true);if(!a){setModernStatus('Open a chat first.');return '';}
  if(is_send_press||is_group_generating||(streamingProcessor&&!streamingProcessor.isFinished)){setModernStatus('Chat generation running.');return '';}
  if(!resume&&(a.draftId!==null||a.job)){setModernStatus('Apply/discard or resume the pending draft first.');return '';}
- const prior=revisionById(a,a.draftId);let base=resume?String($('#palimpest_draft_contents').val()||prior?.text||''):'';
- if(resume&&!a.job&&!prior)return '';
- if(resume&&!a.job&&!confirm('This older draft has no frozen source snapshot. Rebuild it from the current chat and Summary Prompt?'))return '';
+ const prior=revisionById(a,a.draftId);const active=fromActive?revisionById(a,a.activeId):null;
+ if(fromActive&&(a.draftId!=null||a.job)){setModernStatus('Apply or discard the pending draft first.');return '';}
+ if(fromActive&&!active?.text?.trim())return '';
+ const saved=fromActive?appliedSource(a):null;
+ let base=fromActive?active.text:resume?String($('#palimpest_draft_contents').val()||prior?.text||''):'';
+ if(resume&&!fromActive&&!a.job&&!prior)return '';
+ if(fromActive&&!saved&&!confirm('This active Memory Book has no original source snapshot. Continue using the current chat and Summary Prompt? The existing text will be kept unchanged.'))return '';
+ if(resume&&!fromActive&&!a.job&&!confirm('This older draft has no frozen source snapshot. Rebuild it from the current chat and Summary Prompt?'))return '';
  const run=++modernRun;modernBusy=true;inApiCall=true;controller=new AbortController();const signal=controller.signal;refreshModernUI();deactivateSendButtons();let job=a.job,partial='',lastSave=0,lastRender=0,lastCheckpoint='';
  const valid=()=>run===modernRun&&!isContextChanged(c);
  try{
-  if(!job){const prompt=substituteParamsExtended(extension_settings.palimpest.prompt,{words:extension_settings.palimpest.promptWords});const snapshot=await buildSnapshot(c,prompt);if(!valid())return '';job={snapshot,signature:historySignature(c),baseId:a.activeId,createdAt:new Date().toISOString()};a.job=job;a.draftBase=job.baseId;a.draftSignature=job.signature;}
+  if(!job){
+   const snapshot=saved?.snapshot ?? await buildSnapshot(c,substituteParamsExtended(extension_settings.palimpest.prompt,{words:extension_settings.palimpest.promptWords}));
+   if(!valid())return '';
+   job={snapshot,signature:saved?.signature ?? historySignature(c),baseId:a.activeId,createdAt:new Date().toISOString()};a.job=job;a.draftBase=job.baseId;a.draftSignature=job.signature;
+   if(fromActive){const seed=addRevision(a,base,'Active continuation starting point',snapshot.messageCount,active.id);seed.finishReason='pending';a.draftId=seed.id;loadDraftUI();}
+  }
   if(resume&&prior&&base!==prior.text){const edited=addRevision(a,base,'Draft edit before continuation',c.chat.length,prior.id);a.draftId=edited.id;}
   if(!await persistArchive(c,'Source snapshot saved. Generating…')||!valid())return '';
   const messages=base?continuationMessages(job.snapshot,base):job.snapshot.messages;
-  const counts=job.snapshot.counts;$('#palimpest_context_report').text(Object.entries(counts).map(([k,v])=>k+': '+Number(v).toLocaleString()+' chars').join(' · ')+' · RP preset: excluded');
+  const counts=job.snapshot.counts||{};$('#palimpest_context_report').text(Object.entries(counts).map(([k,v])=>k+': '+Number(v).toLocaleString()+' chars').join(' · ')+' · RP preset: excluded');
   const checkpoint=async(text,force=false)=>{partial=text;if(!valid()||!text)return;const now=Date.now();if(!force&&now-lastRender<=400&&now-lastSave<=12000)return;const merged=appendSuffix(base,text);if(force||Date.now()-lastRender>400){$('#palimpest_draft_panel').show();$('#palimpest_draft_contents').val(merged);$('#palimpest_draft_stats').text(textStats(merged)+' · receiving…');lastRender=Date.now();}if((force||Date.now()-lastSave>12000)&&merged!==lastCheckpoint){job.partial=merged;lastCheckpoint=merged;lastSave=Date.now();await persistArchive(c,'Receiving · checkpoint saved.');}};
   const result=await requestSelected(messages,signal,checkpoint);partial=result.text;if(!valid())return '';
   if(!partial.trim()&&!base)throw new Error('No summary text returned.');
-  const merged=appendSuffix(base,partial);const e=addRevision(a,merged,resume?'Continued draft':'Generated draft',job.snapshot.messageCount,a.draftId);e.finishReason=result.finishReason;e.connectionProfile=result.profile;e.model=result.model;e.usage={};for(const k of ['prompt_tokens','completion_tokens','total_tokens'])if(Number.isFinite(result.usage?.[k]))e.usage[k]=result.usage[k];a.draftId=e.id;delete job.partial;loadDraftUI();await persistArchive(c,'Draft saved · finish: '+e.finishReason+' · Continue if incomplete, or Apply.');return merged;
+  const merged=appendSuffix(base,partial);const e=addRevision(a,merged,fromActive?'Continued active memory':resume?'Continued draft':'Generated draft',job.snapshot.messageCount,a.draftId);e.finishReason=result.finishReason;e.connectionProfile=result.profile;e.model=result.model;e.usage={};for(const k of ['prompt_tokens','completion_tokens','total_tokens'])if(Number.isFinite(result.usage?.[k]))e.usage[k]=result.usage[k];a.draftId=e.id;delete job.partial;loadDraftUI();await persistArchive(c,'Draft saved · finish: '+e.finishReason+' · Continue if incomplete, or Apply.');return merged;
  }catch(e){if(valid()){if(partial){const merged=appendSuffix(base,partial);const r=addRevision(a,merged,'Interrupted draft',job?.snapshot?.messageCount||c.chat.length,a.draftId);r.finishReason=signal.aborted?'cancelled':'interrupted';a.draftId=r.id;if(job)delete job.partial;loadDraftUI();await persistArchive(c,'Interrupted draft saved. Continue from cutoff.');}else{setModernStatus('Generation failed. Previous memory and checkpoint kept. Check connection, quota or context limit. '+(signal.aborted?'Stopped.':''));}}return '';}
  finally{controller=null;inApiCall=false;modernBusy=false;activateSendButtons();if(!valid())onChatChanged();else refreshModernUI();}
 }
-async function applyModernDraft(){if(modernBusy||currentDirty)return;const c=getContext(),a=archiveFor(c),d=revisionById(a,a?.draftId);if(!d)return;const t=String($('#palimpest_draft_contents').val()||'');if(!t.trim())return;if((!['stop','end_turn'].includes(d.finishReason)||a.activeId!==a.draftBase||historySignature(c)!==a.draftSignature)&&!confirm('Draft may be incomplete or based on an older chat state. Apply anyway?'))return;a.draftId=a.draftBase=a.draftSignature=null;delete a.job;await commitRevision(t,'Applied draft',d.id);}
+async function applyModernDraft(){if(modernBusy||currentDirty)return;const c=getContext(),a=archiveFor(c),d=revisionById(a,a?.draftId);if(!d)return;const t=String($('#palimpest_draft_contents').val()||'');if(!t.trim())return;if((!['stop','end_turn'].includes(d.finishReason)||a.activeId!==a.draftBase||historySignature(c)!==a.draftSignature)&&!confirm('Draft may be incomplete or based on an older chat state. Apply anyway?'))return;const source=a.job?{snapshot:a.job.snapshot,signature:a.job.signature}:null;a.draftId=a.draftBase=a.draftSignature=null;delete a.job;await commitRevision(t,'Applied draft',d.id,source);}
 async function saveDraftEdit(){if(modernBusy||currentDirty)return;const c=getContext(),a=archiveFor(c),d=revisionById(a,a?.draftId),t=String($('#palimpest_draft_contents').val()||'');if(!d||!t.trim()||t===d.text)return;const r=addRevision(a,t,'Draft edit',c.chat.length,d.id);r.finishReason=d.finishReason;a.draftId=r.id;loadDraftUI();await persistArchive(c,'Draft edit saved.');}
 async function discardModernDraft(){if(modernBusy||currentDirty)return;const c=getContext(),a=archiveFor(c);if(!a)return;const d=revisionById(a,a.draftId),t=String($('#palimpest_draft_contents').val()||'');if(d&&t.trim()&&t!==d.text)addRevision(a,t,'Discarded draft edit',c.chat.length,d.id);a.draftId=a.draftBase=a.draftSignature=null;delete a.job;loadDraftUI();await persistArchive(c,'Draft closed; history retained.');}
 function recoverCheckpoint(c){const a=archiveFor(c);if(a?.job?.partial){const r=addRevision(a,a.job.partial,'Recovered stream checkpoint',a.job.snapshot.messageCount,a.draftId);r.finishReason='interrupted';a.draftId=r.id;delete a.job.partial;return true;}return false;}
-async function commitRevision(text, reason, restoredFrom = null) {
+async function commitRevision(text, reason, restoredFrom = null, source = null) {
     if (modernBusy) return;
     const context = getContext(); const archive = archiveFor(context, true);
     if (!archive) { setModernStatus('Open a chat first.'); return; }
@@ -366,7 +380,12 @@ async function commitRevision(text, reason, restoredFrom = null) {
     if (sourceRevision?.model) entry.model = sourceRevision.model;
     if (sourceRevision?.finishReason) entry.finishReason = sourceRevision.finishReason;
     if (sourceRevision?.usage) entry.usage = {...sourceRevision.usage};
+    const previousSource=appliedSource(archive);
+    // Exact-text restore of the current revision can retain its snapshot; other edits require a fresh source.
+    const keepSource=source ?? (previousSource && sourceRevision?.id===previousSource.revisionId && sourceRevision.text===text ? previousSource : null);
     archive.activeId = entry.id;
+    if(keepSource?.snapshot) archive.appliedSource={revisionId:entry.id,snapshot:keepSource.snapshot,signature:keepSource.signature};
+    else delete archive.appliedSource;
     currentDirty = false;
     // Also write the legacy slot so the stock extension can read the active memory.
     setMemoryContext(text, false);
@@ -411,7 +430,7 @@ function exportModernMemory(selector, suffix) {
 function exportArchive() {
     const archive = archiveFor(getContext(), true);
     if (!archive?.revisions.length) { toastr.info('No versions to export.'); return; }
-    downloadMemory(JSON.stringify({...archive, job:undefined}, null, 2), `Memory-Book-history-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    downloadMemory(JSON.stringify({...archive, job:undefined, appliedSource:undefined}, null, 2), `Memory-Book-history-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
 }
 
 const formatMemoryValue = function (value) {
@@ -433,7 +452,7 @@ const formatMemoryValue = function (value) {
 function setupListeners(){
  const bind=(id,event,fn)=>$(id).off(event+'.palimpest').on(event+'.palimpest',fn);
  bind('#palimpest_connection_profile','change',function(){extension_settings.palimpest.connectionProfile=String($(this).val()||'');saveSettingsDebounced();closeMicroEditor();refreshMicroUI();});
- for(const [id,fn] of Object.entries({palimpest_micro_add:()=>openMicroEditor(),palimpest_micro_edit:()=>openMicroEditor(selectedMicro()),palimpest_micro_delete:deleteMicroPreset,palimpest_micro_test:testMicroPreset,palimpest_micro_save:saveMicroEditor,palimpest_micro_cancel:closeMicroEditor,palimpest_profile_refresh:refreshProfileSelector,palimpest_force_summarize:generateModernDraft,palimpest_continue:continueDraft,palimpest_stop:()=>controller?.abort(),palimpest_cancel_job:discardModernDraft,palimpest_draft_apply:applyModernDraft,palimpest_draft_save:saveDraftEdit,palimpest_draft_discard:discardModernDraft,palimpest_save_current:saveCurrentEdits,palimpest_backup_now:backupCurrent,palimpest_history_restore:restoreSelected,palimpest_history_export:()=>exportModernMemory('#palimpest_history_preview','version-'+$('#palimpest_history_select').val()),palimpest_history_export_all:exportArchive,palimpest_export:()=>exportModernMemory('#palimpest_contents','current'),palimpest_draft_export:()=>exportModernMemory('#palimpest_draft_contents','draft'),palimpest_restore:()=>{renderHistory();$('#palimpest_history_panel').toggle();},palimpestSettingsBlockToggle:()=>$('#palimpestSettingsBlock').slideToggle(150),palimpest_prompt_restore:()=>{if(confirm('Clear the saved Summary Prompt? This does not change existing Memory Books or draft snapshots.')){$('#palimpest_prompt').val(defaultPrompt).trigger('input');}}}))bind('#'+id,'click',fn);
+ for(const [id,fn] of Object.entries({palimpest_micro_add:()=>openMicroEditor(),palimpest_micro_edit:()=>openMicroEditor(selectedMicro()),palimpest_micro_delete:deleteMicroPreset,palimpest_micro_test:testMicroPreset,palimpest_micro_save:saveMicroEditor,palimpest_micro_cancel:closeMicroEditor,palimpest_profile_refresh:refreshProfileSelector,palimpest_force_summarize:generateModernDraft,palimpest_continue:continueDraft,palimpest_continue_current:continueCurrent,palimpest_stop:()=>controller?.abort(),palimpest_cancel_job:discardModernDraft,palimpest_draft_apply:applyModernDraft,palimpest_draft_save:saveDraftEdit,palimpest_draft_discard:discardModernDraft,palimpest_save_current:saveCurrentEdits,palimpest_backup_now:backupCurrent,palimpest_history_restore:restoreSelected,palimpest_history_export:()=>exportModernMemory('#palimpest_history_preview','version-'+$('#palimpest_history_select').val()),palimpest_history_export_all:exportArchive,palimpest_export:()=>exportModernMemory('#palimpest_contents','current'),palimpest_draft_export:()=>exportModernMemory('#palimpest_draft_contents','draft'),palimpest_restore:()=>{renderHistory();$('#palimpest_history_panel').toggle();},palimpestSettingsBlockToggle:()=>$('#palimpestSettingsBlock').slideToggle(150),palimpest_prompt_restore:()=>{if(confirm('Clear the saved Summary Prompt? This does not change existing Memory Books or draft snapshots.')){$('#palimpest_prompt').val(defaultPrompt).trigger('input');}}}))bind('#'+id,'click',fn);
  bind('#palimpest_history_select','change',renderHistoryPreview);bind('#palimpest_draft_contents','input',refreshModernUI);bind('#palimpest_contents','input',function(){currentDirty=String($(this).val()||'')!==activeText();refreshModernUI();});
  for(const [id,key,type] of [['palimpest_prompt','prompt','str'],['palimpest_template','template','str'],['palimpest_depth','depth','num'],['palimpest_role','role','num'],['palimpest_include_wi_scan','scan','bool'],['palimpest_native_max','nativeMax','num']])bind('#'+id,'input',function(){const v=type==='bool'?$(this).prop('checked'):type==='num'?Number($(this).val()):String($(this).val()||'');if(type==='num'&&!Number.isFinite(v))return;extension_settings.palimpest[key]=v;saveSettingsDebounced();if(['template','depth','role','scan'].includes(key))reinsertMemory();});
  bind('input[name="palimpest_position"]','change',function(){extension_settings.palimpest.position=Number($(this).val());saveSettingsDebounced();reinsertMemory();});
