@@ -1,0 +1,10 @@
+{
+  "display_name": "Palimpest",
+  "loading_order": 30,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Palimpest contributors; based on SillyTavern Summarize (Cohee)",
+  "version": "1.0.2"
+}

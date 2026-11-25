@@ -1,0 +1,127 @@
+/* SPDX-License-Identifier: AGPL-3.0-only; adapted from SillyTavern Summarize; modified 2026-11-25. */
+#palimpest_settings {
+    display: flex;
+    flex-direction: column;
+}
+
+#palimpest_contents {
+    field-sizing: content;
+    max-height: 50dvh;
+}
+
+#palimpest_restore {
+    width: max-content;
+}
+
+label[for="palimpest_frozen"],
+label[for="palimpest_skipWIAN"] {
+    display: flex;
+    align-items: center;
+    margin: 0 !important;
+}
+
+label[for="palimpest_frozen"] input {
+    margin-right: 10px;
+}
+
+.palimpest_contents_controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.palimpest_disabled_hint {
+    margin-left: 2px;
+}
+
+#palimpestSettingsBlock {
+    display: flex;
+    flex-direction: column;
+    row-gap: 5px;
+}
+
+#summaryExtensionPopout {
+    display: flex;
+    flex-direction: column;
+    padding-top: 25px;
+}
+
+/* Manual Memory Book interface; inherits the active SillyTavern theme. */
+#palimpestDrawerContents { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.memory-modern-meta, .memory-modern-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.memory-modern-meta { font-size:.82em; opacity:.8; }
+.memory-modern-meta span { border:1px solid var(--SmartThemeBorderColor, #7775); border-radius:20px; padding:4px 9px; }
+.memory-modern-actions .menu_button { min-height:34px; margin:0; padding:6px 10px; }
+#palimpest_force_summarize, #palimpest_draft_apply { flex:1; }
+.memory-modern-caption { font-size:.8em; opacity:.8; overflow-wrap:anywhere; }
+.memory-modern-draft { border:1px solid var(--SmartThemeBorderColor, #7775); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:6px; }
+#palimpest_contents, #palimpest_draft_contents { width:100%; box-sizing:border-box; min-height:6em; max-height:42dvh; overflow:auto; resize:vertical; }
+#palimpest_restore { cursor:pointer; }
+.memory-modern-actions button:disabled { opacity:.45; pointer-events:none; }
+
+#palimpest_history_select, #palimpest_history_preview { width:100%; min-width:0; box-sizing:border-box; }
+#palimpest_history_preview { min-height:6em; max-height:42dvh; overflow:auto; resize:vertical; }
+#palimpest_history_panel { min-width:0; }
+#palimpest_history_count { font-size:.8em; opacity:.8; }
+
+#palimpest_connection_profile { min-width:0; width:100%; }
+#palimpest_profile_refresh { flex:0 0 auto; min-height:34px; }
+
+#palimpest_micro_panel { min-width:0; }
+#palimpest_micro_panel input:not([type=checkbox]) { width:100%; min-width:0; box-sizing:border-box; }
+#palimpest_micro_error { color:var(--SmartThemeQuoteColor, #e88); }
+.memory-modern-meta #palimpest_mode_label { border:0; padding:0; }
+
+/* 1.0.1: compact API controls and equal-width generation buttons. */
+#palimpest_settings .palimpest-micro-drawer {
+    min-width: 0;
+    border: 1px solid var(--SmartThemeBorderColor, #7775);
+    border-radius: 8px;
+    margin: 0;
+    padding: 0;
+}
+#palimpest_settings .palimpest-micro-drawer > summary {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    list-style: none;
+    font-size: .85em;
+    padding: 6px 9px;
+    min-height: 28px;
+    box-sizing: border-box;
+}
+#palimpest_settings .palimpest-micro-drawer > summary::-webkit-details-marker { display: none; }
+#palimpest_settings .palimpest-micro-chevron { margin-inline-start: auto; font-size: .8em; opacity: .7; transition: transform .15s ease; }
+#palimpest_settings .palimpest-micro-drawer[open] .palimpest-micro-chevron { transform: rotate(180deg); }
+#palimpest_settings .palimpest-micro-body { display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px; min-width: 0; }
+#palimpest_settings .palimpest-micro-drawer:not([open]) > .palimpest-micro-body { display: none; }
+#palimpest_settings .palimpest-generation-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: stretch;
+    gap: 6px;
+}
+#palimpest_settings .palimpest-generation-actions > .menu_button {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 36px;
+    height: auto;
+    margin: 0;
+    padding: 6px 10px;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+}
+#palimpest_settings #palimpest_force_summarize,
+#palimpest_settings #palimpest_stop,
+#palimpest_settings #palimpest_continue,
+#palimpest_settings #palimpest_cancel_job { grid-column: 1; }
+#palimpest_settings #palimpest_export { grid-column: 2; grid-row: 1; }
+#palimpest_settings #palimpest_force_summarize,
+#palimpest_settings #palimpest_stop { height: 40px; }

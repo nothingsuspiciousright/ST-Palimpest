@@ -1,0 +1,16 @@
+Palimpest — standalone memory manager for SillyTavern
+
+License: GNU Affero General Public License, version 3 (AGPL-3.0-only).
+See LICENSE for the complete license text.
+
+Derived from the built-in SillyTavern Summarize extension.
+Original extension author as recorded in its manifest: Cohee.
+Upstream project: https://github.com/SillyTavern/SillyTavern
+Upstream extension: public/scripts/extensions/memory/
+Original work credited to Cohee and the SillyTavern contributors.
+
+Modified by Palimpest contributors, November 2026; public release 2026-11-25.
+Changes include independent context construction, manual generation,
+versioned chat archives, resumable drafts, API micro-presets, and UI changes.
+This is an independent community extension, not an official SillyTavern release.
+The editable source code is included in this distribution. No warranty.

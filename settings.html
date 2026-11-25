@@ -1,0 +1,158 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only; adapted from SillyTavern Summarize; modified 2026-11-25. -->
+<div id="palimpest_settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <div class="flex-container alignitemscenter margin0">
+                <b>Palimpest</b>
+                
+            </div>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div id="palimpestDrawerContents">
+                <div class="memory-modern-meta"><span><i class="fa-solid fa-database"></i> <span id="palimpest_mode_label">Isolated context · no RP preset</span></span><span><i class="fa-solid fa-hand"></i> Manual</span></div>
+                <label for="palimpest_connection_profile">Summarize with:</label>
+                <div class="flex-container alignitemscenter" style="gap:6px">
+                    <select id="palimpest_connection_profile" class="text_pole flex1" aria-label="Summarization connection profile"><option value="">Current saved ST profile</option></select>
+                    <button id="palimpest_profile_refresh" class="menu_button" type="button" title="Refresh connection profiles"><i class="fa-solid fa-arrows-rotate"></i></button>
+                </div>
+                <small id="palimpest_profile_hint" class="memory-modern-caption">Select a saved ST connection profile, or create a micro-preset.</small>
+                <details id="palimpest_api_presets" class="palimpest-micro-drawer">
+                    <summary><i class="fa-solid fa-sliders" aria-hidden="true"></i> API presets <i class="fa-solid fa-chevron-down palimpest-micro-chevron" aria-hidden="true"></i></summary>
+                    <div class="palimpest-micro-body">
+                        <div class="memory-modern-actions">
+                            <button id="palimpest_micro_add" class="menu_button" type="button"><i class="fa-solid fa-plus"></i> New preset</button>
+                            <button id="palimpest_micro_edit" class="menu_button" type="button" disabled>Edit</button>
+                            <button id="palimpest_micro_test" class="menu_button" type="button" disabled>Test</button>
+                            <button id="palimpest_micro_delete" class="menu_button" type="button" disabled>Delete</button>
+                        </div>
+                        <div id="palimpest_micro_panel" class="memory-modern-draft" style="display:none">
+                            <b id="palimpest_micro_title">New micro-preset</b>
+                            <label for="palimpest_micro_name">Preset name</label>
+                            <input id="palimpest_micro_name" class="text_pole" type="text" maxlength="120" placeholder="My summary API" autocomplete="off">
+                            <label for="palimpest_micro_url">API base URL (OpenAI-compatible)</label>
+                            <input id="palimpest_micro_url" class="text_pole" type="url" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false">
+                            <label for="palimpest_micro_key">API key</label>
+                            <input id="palimpest_micro_key" class="text_pole" type="password" autocomplete="new-password" spellcheck="false" placeholder="API key">
+                            <label class="checkbox_label" for="palimpest_micro_remember"><input id="palimpest_micro_remember" type="checkbox"> Remember key in this browser</label>
+                            <small class="memory-modern-caption">Optional unencrypted browser storage. Otherwise key is held in memory until reload. Never included in Memory Book exports or ST settings.</small>
+                            <label for="palimpest_micro_model">Model ID (exact provider name)</label>
+                            <input id="palimpest_micro_model" class="text_pole" type="text" placeholder="provider/model-id" autocomplete="off" spellcheck="false">
+                            <label for="palimpest_micro_max">Max output tokens (provider limit applies)</label>
+                            <input id="palimpest_micro_max" class="text_pole" type="number" min="1" max="1000000" step="1" value="25000">
+                            <small class="memory-modern-caption">All generation modes use isolated context: history, character card, persona, Author’s Note, activated World Info, active memory and Summary Prompt. No RP preset. Test sends only a short test message.</small>
+                            <div id="palimpest_micro_error" class="memory-modern-caption" role="alert"></div>
+                            <div class="memory-modern-actions">
+                                <button id="palimpest_micro_save" class="menu_button" type="button">Save preset</button>
+                                <button id="palimpest_micro_cancel" class="menu_button" type="button">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <span >Current Memory Book:</span>
+                    <i class="editor_maximize fa-solid fa-maximize right_menu_button" data-for="palimpest_contents" title="Expand the editor" data-i18n="[title]Expand the editor"></i>
+                    <span class="flex1">&nbsp;</span>
+                    <div id="palimpest_restore" class="menu_button margin0" data-i18n="[title]ext_sum_restore_tip" title="Open the non-destructive version history for this chat.">
+                        <small><i class="fa-solid fa-clock-rotate-left"></i> History</small>
+                    </div>
+                </div>
+
+                <textarea id="palimpest_contents" class="text_pole textarea_compact" rows="6" data-i18n="[placeholder]ext_sum_memory_placeholder" placeholder="Summary will be generated here..."></textarea>
+                <div class="memory-modern-caption" id="palimpest_current_stats"></div>
+                <div class="memory-modern-actions">
+                    <button id="palimpest_save_current" class="menu_button" type="button"><i class="fa-solid fa-floppy-disk"></i> Save changes</button>
+                    <button id="palimpest_backup_now" class="menu_button" type="button"><i class="fa-solid fa-box-archive"></i> Backup now</button>
+                </div>
+                <div id="palimpest_history_panel" class="memory-modern-draft" style="display:none">
+                    <div class="flex-container alignitemscenter justifyspacebetween"><b>Version history</b><small id="palimpest_history_count"></small></div>
+                    <small>Only the active version is sent to the model. Restoring creates a new revision.</small>
+                    <select id="palimpest_history_select" class="text_pole" aria-label="Saved memory versions"></select>
+                    <div id="palimpest_history_info" class="memory-modern-caption"></div>
+                    <textarea id="palimpest_history_preview" class="text_pole textarea_compact" rows="6" readonly placeholder="Select a version to preview"></textarea>
+                    <div class="memory-modern-actions">
+                        <button id="palimpest_history_restore" class="menu_button" type="button">Restore selected</button>
+                        <button id="palimpest_history_export" class="menu_button" type="button">TXT</button>
+                        <button id="palimpest_history_export_all" class="menu_button" type="button">All versions · JSON</button>
+                    </div>
+                </div>
+                <div class="memory-modern-actions palimpest-generation-actions">
+                    <button id="palimpest_force_summarize" class="menu_button" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize now</button>
+                    <button id="palimpest_export" class="menu_button" type="button" title="Export current memory as TXT"><i class="fa-solid fa-download"></i> TXT</button>
+                    <button id="palimpest_stop" class="menu_button" type="button" style="display:none"><i class="fa-solid fa-stop" aria-hidden="true"></i> Stop &amp; keep draft</button>
+                    <button id="palimpest_continue" class="menu_button" type="button" style="display:none">Continue from cutoff</button>
+                    <button id="palimpest_cancel_job" class="menu_button" type="button" style="display:none">Discard pending run</button>
+                </div>
+                <div id="palimpest_context_report" class="memory-modern-caption"></div>
+<div id="palimpest_modern_status" class="memory-modern-caption" role="status" aria-live="polite">Manual updates · ready</div>
+                <div id="palimpest_draft_panel" class="memory-modern-draft" style="display:none">
+                    <div class="flex-container alignitemscenter"><b>Generated draft</b><i class="editor_maximize fa-solid fa-maximize right_menu_button" data-for="palimpest_draft_contents" title="Expand the editor"></i></div>
+                    <small>Review completeness before replacing your memory. The generated original is archived, but not injected until applied. Edited draft text is saved when applied or discarded.</small>
+                    <textarea id="palimpest_draft_contents" class="text_pole textarea_compact" rows="8" placeholder="Generated memory"></textarea>
+                    <div class="memory-modern-caption" id="palimpest_draft_stats"></div>
+                    <div class="memory-modern-actions">
+                        <button id="palimpest_draft_apply" class="menu_button" type="button"><i class="fa-solid fa-check"></i> Apply</button>
+                        <button id="palimpest_draft_export" class="menu_button" type="button"><i class="fa-solid fa-download"></i> TXT</button>
+                        <button id="palimpest_draft_save" class="menu_button" type="button">Save draft edits</button>
+                        <button id="palimpest_draft_discard" class="menu_button" type="button">Discard</button>
+                    </div>
+                </div>
+                <div class="palimpest_contents_controls">
+                    <div id="palimpestSettingsBlockToggle" class="menu_button menu_button_icon" data-i18n="[title]ext_sum_settings_tip" title="Edit summarization prompt, insertion position, etc.">
+                        <i class="fa-solid fa-cog"></i>
+                        <span data-i18n="ext_sum_settings">Summary Settings</span>
+                    </div>
+                </div>
+                <div id="palimpestSettingsBlock" style="display:none;">
+                    <div class="memory-modern-caption">All modes use isolated context. Native profiles require Chat Completion. No RP preset or unrelated extension injections.</div><label for="palimpest_native_max">ST profile max output tokens</label><input id="palimpest_native_max" type="number" min="1" max="1000000" class="text_pole" value="25000">
+                    <div>
+                        <label for="palimpest_prompt" class="title_restorable">
+                            <span data-i18n="Summary Prompt">Summary Prompt</span>
+                            <div id="palimpest_prompt_restore" data-i18n="[title]ext_sum_restore_default_prompt_tip" title="Restore default prompt" class="right_menu_button">
+                                <div class="fa-solid fa-clock-rotate-left"></div>
+                            </div>
+                        </label>
+                        <textarea id="palimpest_prompt" class="text_pole textarea_compact" rows="6" data-i18n="[placeholder]ext_sum_prompt_placeholder" placeholder="Instructions for generating your Memory Book."></textarea>
+                        <small id="palimpest_words_hint" class="memory-modern-caption" style="display:none"></small>
+                        <hr>
+                    </div>
+                    <div class="palimpest_template">
+                        <label for="palimpest_template" data-i18n="ext_sum_injection_template">Injection Template</label>
+                        <textarea id="palimpest_template" class="text_pole textarea_compact" rows="2" data-i18n="[placeholder]ext_sum_memory_template_placeholder" placeholder="&lcub;&lcub;summary&rcub;&rcub; will resolve to the current summary contents."></textarea>
+                    </div>
+                    <label for="palimpest_position" data-i18n="ext_sum_injection_position">Injection Position</label>
+                    <label class="checkbox_label" for="palimpest_include_wi_scan" data-i18n="[title]ext_sum_include_wi_scan_desc" title="Include the latest summary in the WI scan.">
+                        <input id="palimpest_include_wi_scan" type="checkbox" />
+                        <span data-i18n="ext_sum_include_wi_scan">Include in World Info Scanning</span>
+                    </label>
+                    <div class="radio_group">
+                        <label>
+                            <input type="radio" name="palimpest_position" value="-1" />
+                            <span data-i18n="None (not injected)">None (not injected)</span>
+                            <i class="fa-solid fa-info-circle" title="The summary will not be injected into the prompt. You can still access it via the &lcub;&lcub;summary&rcub;&rcub; macro." data-i18n="[title]ext_sum_injection_position_none"></i>
+                        </label>
+                        <label>
+                            <input type="radio" name="palimpest_position" value="2" />
+                            <span data-i18n="Before Main Prompt / Story String">Before Main Prompt / Story String</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="palimpest_position" value="0" />
+                            <span data-i18n="After Main Prompt / Story String">After Main Prompt / Story String</span>
+                        </label>
+                        <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat." data-i18n="[title]How many messages before the current end of the chat.">
+                            <input type="radio" name="palimpest_position" value="1" />
+                            <span data-i18n="In-chat @ Depth">In-chat @ Depth</span> <input id="palimpest_depth" class="text_pole widthUnset" type="number" min="0" max="9999" />
+                            <span data-i18n="as">as</span>
+                            <select id="palimpest_role" class="text_pole widthNatural">
+                                <option value="0" data-i18n="System">System</option>
+                                <option value="1" data-i18n="User">User</option>
+                                <option value="2" data-i18n="Assistant">Assistant</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <small class="memory-modern-caption">Palimpest v1.0.2 · AGPL-3.0 · Based on SillyTavern Summarize (Cohee and contributors). No warranty. See the bundled LICENSE or <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">license terms</a>.</small>
+            </div>
+        </div>
+    </div>
+</div>
