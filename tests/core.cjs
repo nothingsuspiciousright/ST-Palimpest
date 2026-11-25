@@ -4,8 +4,28 @@ const src=fs.readFileSync(require('node:path').join(__dirname,'..','index.js'),'
 const c={chatId:'chat',characterId:0,chatMetadata:{note_prompt:'AN-unique'},chat:[{mes:'first'},{mes:'last',is_user:true,extra:{memory:'Old memory'}}],characters:[{avatar:'card.png',description:'Card unique',data:{extensions:{depth_prompt:{prompt:'card note'}}}}],maxContext:10000};
 const storage=new Map();
 const sandbox={console,structuredClone,Date,Map,TextDecoder,URL,Math,Number,Array,Object,JSON,Error,getContext:()=>c,extension_settings:{palimpest:{connectionProfile:'palimpest-micro:a',microPresets:[{id:'a',name:'Test',url:'https://example.com/v1',model:'mock',maxTokens:500}]},note:{}},power_user:{persona_description:'Persona unique'},extension_prompt_types:{IN_PROMPT:0},extension_prompt_roles:{SYSTEM:0},getStringHash:x=>x.length,groups:[],getWorldInfoPrompt:async(h,max,dry)=>{assert.deepEqual(Array.from(h),['last','first']);assert.equal(dry,true);return{worldInfoBefore:'WI-before',worldInfoAfter:'WI-after',worldInfoDepth:[{entries:['WI-depth']}],anBefore:['WI-AN'],outletEntries:{a:['WI-outlet']}}},getRequestHeaders:()=>({}),localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},jQuery:()=>{},fetch:async()=>{throw Error('not set')}};
-vm.createContext(sandbox);vm.runInContext(src+'\nglobalThis.api={archiveFor,addRevision,activeText,buildSnapshot,continuationMessages,appendSuffix,requestMicro,recoverCheckpoint,parseResult,migrateSelection,findMicro,readMicroKey,rememberedMicroKey,saveMicroKey,removeRememberedKey};',sandbox);const a=sandbox.api;
+vm.createContext(sandbox);vm.runInContext(src+'\nglobalThis.api={archiveFor,addRevision,activeText,buildSnapshot,continuationMessages,appendSuffix,requestMicro,recoverCheckpoint,parseResult,migrateSelection,findMicro,readMicroKey,rememberedMicroKey,saveMicroKey,removeRememberedKey,loadSettings,defaultPrompt,estimateTextTokens,textStats};',sandbox);const a=sandbox.api;
 (async()=>{
+assert.equal(a.estimateTextTokens(''),0);
+assert.equal(a.estimateTextTokens('a'.repeat(4000)),1000);
+assert(a.estimateTextTokens('а'.repeat(4000))>1000);
+assert(a.estimateTextTokens('漢'.repeat(4000))>4000);
+assert(a.estimateTextTokens('\u2800'.repeat(20))>a.estimateTextTokens(' '.repeat(20)));
+assert(a.textStats('one\u2800two').startsWith('2 words'));
+assert(a.textStats('').includes('≈ 0 tokens'));
+console.log('PASS: local approximate token counts, multilingual and Braille blank handling.');
+// Prompt defaults are empty; local settings and legacy imports are never overwritten.
+assert.equal(a.defaultPrompt,'');
+const settingsBefore=sandbox.extension_settings;
+sandbox.$=()=>({val(){return this},prop(){return this}});
+sandbox.saveSettingsDebounced=()=>{};
+sandbox.extension_settings={};a.loadSettings();assert.equal(sandbox.extension_settings.palimpest.prompt,'');
+sandbox.extension_settings={memory:{prompt:'Private local fixture'}};a.loadSettings();assert.equal(sandbox.extension_settings.palimpest.prompt,'Private local fixture');
+sandbox.extension_settings={palimpest:{prompt:'Existing local fixture'},memory:{prompt:'Older fixture'}};a.loadSettings();assert.equal(sandbox.extension_settings.palimpest.prompt,'Existing local fixture');
+sandbox.extension_settings={palimpest:{prompt:''},memory:{prompt:'Older fixture'}};a.loadSettings();assert.equal(sandbox.extension_settings.palimpest.prompt,'');
+sandbox.extension_settings=settingsBefore;
+await assert.rejects(a.buildSnapshot(c,''),/Summary Prompt is empty/);
+console.log('PASS: blank fresh default, local prompt migration and preservation, empty prompt validation.');
 // Regression coverage: migrate the full legacy archive, not just its active text.
 const oldArchive={schema:1,nextId:3,activeId:1,draftId:2,draftBase:1,draftSignature:'sig',revisions:[{id:1,text:'Active'},{id:2,text:'Draft'}],job:{snapshot:{messages:[{role:'system',content:'Original skeleton'}],messageCount:2},partial:'Draft + received text'}};
 const oldChat={chatId:'legacy',chatMetadata:{sola_memory_archive_v1:oldArchive},chat:[{mes:'example'}]};

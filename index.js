@@ -25,7 +25,8 @@ function migrateSelection(settings) {
         settings.connectionProfile = MICRO_PREFIX + value.slice(LEGACY_MICRO_PREFIX.length);
     }
 }
-const defaultPrompt='Create a detailed, chronological Memory Book. Preserve established facts, relationships, promises, items and knowledge boundaries. Return only the Memory Book.';
+// No bundled summary skeleton. User-authored prompts remain local settings.
+const defaultPrompt='';
 const defaultSettings={prompt:defaultPrompt,template:'[Summary: {{summary}}]',position:extension_prompt_types.IN_PROMPT,role:extension_prompt_roles.SYSTEM,scan:false,depth:2,promptWords:200,connectionProfile:'',microPresets:[],nativeMax:25000};
 function loadSettings(){
  if(!extension_settings.palimpest){ const old=extension_settings.memory||{}; extension_settings.palimpest={}; for(const k of Object.keys(defaultSettings)) if(old[k]!==undefined) extension_settings.palimpest[k]=structuredClone(old[k]); }
@@ -76,6 +77,26 @@ function historySignature(context) {
     return context.chat.length + ':' + getStringHash(context.chat.map(message => `${message.is_user ? 1 : 0}:${message.mes ?? ''}`).join('\u001f'));
 }
 function setModernStatus(message) { $('#palimpest_modern_status').text(message); }
+// Local, model-independent estimate of visible text only, not API billing usage.
+function estimateTextTokens(value) {
+    const text = String(value ?? '');
+    let estimate = 0;
+    for (const char of text) {
+        const cp = char.codePointAt(0);
+        if (cp === 0x2800) estimate += 1.5; // Braille blank is not an ASCII space.
+        else if (cp < 128) estimate += /[A-Za-z0-9\s]/.test(char) ? 0.25 : 0.5;
+        else if (/\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u.test(char)) estimate += 1.2;
+        else if (/\p{Extended_Pictographic}/u.test(char)) estimate += 2;
+        else if (/\p{Script=Cyrillic}/u.test(char)) estimate += 0.5;
+        else estimate += 0.75;
+    }
+    return Math.ceil(estimate);
+}
+function textStats(value) {
+    const text = String(value ?? '');
+    const words = text.split(/[\s\u2800]+/u).filter(Boolean).length;
+    return `${words.toLocaleString()} words · ${text.length.toLocaleString()} chars · ≈ ${estimateTextTokens(text).toLocaleString()} tokens`;
+}
 function renderHistory() {
     const archive = archiveFor();
     const list = $('#palimpest_history_select');
@@ -94,7 +115,7 @@ function renderHistoryPreview() {
     const archive = archiveFor();
     const entry = revisionById(archive, Number($('#palimpest_history_select').val()));
     $('#palimpest_history_preview').val(entry?.text ?? '');
-    $('#palimpest_history_info').text(entry ? `${entry.text.length.toLocaleString()} chars · ${entry.messages ?? '?'} chat messages${entry.finishReason ? ' · finish: ' + entry.finishReason : ''}${entry.usage?.completion_tokens != null ? ' · ' + entry.usage.completion_tokens.toLocaleString() + ' output tokens' : ''}` : 'No versions yet.');
+    $('#palimpest_history_info').text(entry ? `${textStats(entry.text)} · ${entry.messages ?? '?'} chat messages${entry.finishReason ? ' · finish: ' + entry.finishReason : ''}${entry.usage?.completion_tokens != null ? ' · ' + entry.usage.completion_tokens.toLocaleString() + ' API output tokens' : ''}` : 'No versions yet.');
     $('#palimpest_history_restore, #palimpest_history_export').prop('disabled', !entry || modernBusy);
 }
 function refreshModernUI() {
@@ -102,8 +123,7 @@ function refreshModernUI() {
     const archive = archiveFor(context);
     const draft = revisionById(archive, archive?.draftId);
     const current = String($('#palimpest_contents').val() ?? '');
-    const words = current.trim() ? current.trim().split(/[\s\u2800]+/u).length : 0;
-    $('#palimpest_current_stats').text(`${words.toLocaleString()} words · ${current.length.toLocaleString()} chars${currentDirty ? ' · unsaved edits' : ''}`);
+    $('#palimpest_current_stats').text(`${textStats(current)}${currentDirty ? ' · unsaved edits' : ''}`);
     $('#palimpest_force_summarize').prop('disabled', modernBusy || inApiCall || currentDirty || !!draft || !!archive?.job);
     $('#palimpest_continue').toggle(!!draft || !!archive?.job).prop('disabled',modernBusy || currentDirty);
     $('#palimpest_stop').toggle(modernBusy && !!controller);
@@ -115,7 +135,7 @@ function refreshModernUI() {
     $('#palimpest_backup_now, #palimpest_history_restore').prop('disabled', modernBusy || currentDirty);
     $('#palimpest_draft_panel').toggle(Boolean(draft) || (modernBusy && !!archive?.job));
     $('#palimpest_draft_apply, #palimpest_draft_discard, #palimpest_draft_save, #palimpest_draft_contents').prop('disabled', modernBusy || currentDirty);
-    $('#palimpest_draft_stats').text(draft ? `#${draft.id} · ${String($('#palimpest_draft_contents').val() ?? '').length.toLocaleString()} chars · not active${draft.finishReason ? ' · finish: ' + draft.finishReason : ''}${draft.usage?.completion_tokens != null ? ' · ' + draft.usage.completion_tokens.toLocaleString() + ' output tokens' : ''}` : '');
+    $('#palimpest_draft_stats').text(draft ? `#${draft.id} · ${textStats($('#palimpest_draft_contents').val())} · not active${draft.finishReason ? ' · finish: ' + draft.finishReason : ''}${draft.usage?.completion_tokens != null ? ' · ' + draft.usage.completion_tokens.toLocaleString() + ' API output tokens' : ''}` : '');
     refreshMicroUI();
     $('#palimpest_words_hint').toggle(String($('#palimpest_prompt').val() ?? '').includes('{{words}}'))
         .text(`Legacy {{words}} macro resolves to ${extension_settings.palimpest.promptWords}. Remove it from your prompt for no word target.`);
@@ -325,7 +345,7 @@ async function runDraft(resume){
   if(!await persistArchive(c,'Source snapshot saved. Generating…')||!valid())return '';
   const messages=base?continuationMessages(job.snapshot,base):job.snapshot.messages;
   const counts=job.snapshot.counts;$('#palimpest_context_report').text(Object.entries(counts).map(([k,v])=>k+': '+Number(v).toLocaleString()+' chars').join(' · ')+' · RP preset: excluded');
-  const checkpoint=async(text,force=false)=>{partial=text;if(!valid()||!text)return;const now=Date.now();if(!force&&now-lastRender<=400&&now-lastSave<=12000)return;const merged=appendSuffix(base,text);if(force||Date.now()-lastRender>400){$('#palimpest_draft_panel').show();$('#palimpest_draft_contents').val(merged);$('#palimpest_draft_stats').text(merged.length.toLocaleString()+' chars · receiving…');lastRender=Date.now();}if((force||Date.now()-lastSave>12000)&&merged!==lastCheckpoint){job.partial=merged;lastCheckpoint=merged;lastSave=Date.now();await persistArchive(c,'Receiving · checkpoint saved.');}};
+  const checkpoint=async(text,force=false)=>{partial=text;if(!valid()||!text)return;const now=Date.now();if(!force&&now-lastRender<=400&&now-lastSave<=12000)return;const merged=appendSuffix(base,text);if(force||Date.now()-lastRender>400){$('#palimpest_draft_panel').show();$('#palimpest_draft_contents').val(merged);$('#palimpest_draft_stats').text(textStats(merged)+' · receiving…');lastRender=Date.now();}if((force||Date.now()-lastSave>12000)&&merged!==lastCheckpoint){job.partial=merged;lastCheckpoint=merged;lastSave=Date.now();await persistArchive(c,'Receiving · checkpoint saved.');}};
   const result=await requestSelected(messages,signal,checkpoint);partial=result.text;if(!valid())return '';
   if(!partial.trim()&&!base)throw new Error('No summary text returned.');
   const merged=appendSuffix(base,partial);const e=addRevision(a,merged,resume?'Continued draft':'Generated draft',job.snapshot.messageCount,a.draftId);e.finishReason=result.finishReason;e.connectionProfile=result.profile;e.model=result.model;e.usage={};for(const k of ['prompt_tokens','completion_tokens','total_tokens'])if(Number.isFinite(result.usage?.[k]))e.usage[k]=result.usage[k];a.draftId=e.id;delete job.partial;loadDraftUI();await persistArchive(c,'Draft saved · finish: '+e.finishReason+' · Continue if incomplete, or Apply.');return merged;
@@ -413,7 +433,7 @@ const formatMemoryValue = function (value) {
 function setupListeners(){
  const bind=(id,event,fn)=>$(id).off(event+'.palimpest').on(event+'.palimpest',fn);
  bind('#palimpest_connection_profile','change',function(){extension_settings.palimpest.connectionProfile=String($(this).val()||'');saveSettingsDebounced();closeMicroEditor();refreshMicroUI();});
- for(const [id,fn] of Object.entries({palimpest_micro_add:()=>openMicroEditor(),palimpest_micro_edit:()=>openMicroEditor(selectedMicro()),palimpest_micro_delete:deleteMicroPreset,palimpest_micro_test:testMicroPreset,palimpest_micro_save:saveMicroEditor,palimpest_micro_cancel:closeMicroEditor,palimpest_profile_refresh:refreshProfileSelector,palimpest_force_summarize:generateModernDraft,palimpest_continue:continueDraft,palimpest_stop:()=>controller?.abort(),palimpest_cancel_job:discardModernDraft,palimpest_draft_apply:applyModernDraft,palimpest_draft_save:saveDraftEdit,palimpest_draft_discard:discardModernDraft,palimpest_save_current:saveCurrentEdits,palimpest_backup_now:backupCurrent,palimpest_history_restore:restoreSelected,palimpest_history_export:()=>exportModernMemory('#palimpest_history_preview','version-'+$('#palimpest_history_select').val()),palimpest_history_export_all:exportArchive,palimpest_export:()=>exportModernMemory('#palimpest_contents','current'),palimpest_draft_export:()=>exportModernMemory('#palimpest_draft_contents','draft'),palimpest_restore:()=>{renderHistory();$('#palimpest_history_panel').toggle();},palimpestSettingsBlockToggle:()=>$('#palimpestSettingsBlock').slideToggle(150),palimpest_prompt_restore:()=>{if(confirm('Restore default Summary Prompt?')){$('#palimpest_prompt').val(defaultPrompt).trigger('input');}}}))bind('#'+id,'click',fn);
+ for(const [id,fn] of Object.entries({palimpest_micro_add:()=>openMicroEditor(),palimpest_micro_edit:()=>openMicroEditor(selectedMicro()),palimpest_micro_delete:deleteMicroPreset,palimpest_micro_test:testMicroPreset,palimpest_micro_save:saveMicroEditor,palimpest_micro_cancel:closeMicroEditor,palimpest_profile_refresh:refreshProfileSelector,palimpest_force_summarize:generateModernDraft,palimpest_continue:continueDraft,palimpest_stop:()=>controller?.abort(),palimpest_cancel_job:discardModernDraft,palimpest_draft_apply:applyModernDraft,palimpest_draft_save:saveDraftEdit,palimpest_draft_discard:discardModernDraft,palimpest_save_current:saveCurrentEdits,palimpest_backup_now:backupCurrent,palimpest_history_restore:restoreSelected,palimpest_history_export:()=>exportModernMemory('#palimpest_history_preview','version-'+$('#palimpest_history_select').val()),palimpest_history_export_all:exportArchive,palimpest_export:()=>exportModernMemory('#palimpest_contents','current'),palimpest_draft_export:()=>exportModernMemory('#palimpest_draft_contents','draft'),palimpest_restore:()=>{renderHistory();$('#palimpest_history_panel').toggle();},palimpestSettingsBlockToggle:()=>$('#palimpestSettingsBlock').slideToggle(150),palimpest_prompt_restore:()=>{if(confirm('Clear the saved Summary Prompt? This does not change existing Memory Books or draft snapshots.')){$('#palimpest_prompt').val(defaultPrompt).trigger('input');}}}))bind('#'+id,'click',fn);
  bind('#palimpest_history_select','change',renderHistoryPreview);bind('#palimpest_draft_contents','input',refreshModernUI);bind('#palimpest_contents','input',function(){currentDirty=String($(this).val()||'')!==activeText();refreshModernUI();});
  for(const [id,key,type] of [['palimpest_prompt','prompt','str'],['palimpest_template','template','str'],['palimpest_depth','depth','num'],['palimpest_role','role','num'],['palimpest_include_wi_scan','scan','bool'],['palimpest_native_max','nativeMax','num']])bind('#'+id,'input',function(){const v=type==='bool'?$(this).prop('checked'):type==='num'?Number($(this).val()):String($(this).val()||'');if(type==='num'&&!Number.isFinite(v))return;extension_settings.palimpest[key]=v;saveSettingsDebounced();if(['template','depth','role','scan'].includes(key))reinsertMemory();});
  bind('input[name="palimpest_position"]','change',function(){extension_settings.palimpest.position=Number($(this).val());saveSettingsDebounced();reinsertMemory();});

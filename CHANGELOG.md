@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.4 — Local token estimates
+
+- Show approximate text tokens alongside word and character counts for active memory, live and saved drafts, and archived versions.
+- Use a local multilingual heuristic without API calls; keep provider-reported output usage separate.
+- No changes to stored prompts, archives or API presets.
+
+## 1.0.3 — Bring your own summary prompt
+
+- No bundled summary prompt or skeleton; fresh installations without legacy settings start with an empty field.
+- Preserve existing saved and locally imported prompts. Clearing the setting does not alter existing Memory Books or frozen continuation snapshots.
+
 ## 1.0.2 — Public release (2026-11-25)
 
 - Added English documentation, Russian documentation, full AGPL-3.0 license, upstream attribution, and a data-safe `.gitignore`.

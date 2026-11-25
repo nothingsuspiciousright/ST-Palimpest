@@ -4,7 +4,7 @@
 
 A standalone, manual Memory Book manager for SillyTavern. Generate, review, preserve, and continue long-form summaries without mixing the roleplay preset into the summarization request.
 
-**Version:** 1.0.2 · **License:** [AGPL-3.0](LICENSE) · [Русская документация](README.ru.md) · [Changelog](CHANGELOG.md)
+**Version:** 1.0.4 · **License:** [AGPL-3.0](LICENSE) · [Русская документация](README.ru.md) · [Changelog](CHANGELOG.md)
 
 ## Features
 
@@ -14,6 +14,7 @@ A standalone, manual Memory Book manager for SillyTavern. Generate, review, pres
 - **Draft-first workflow:** the active Memory Book remains unchanged until a draft is applied.
 - **Resume interrupted generation:** keep received text and continue using the original summary prompt, source snapshot, and accumulated draft. Switch providers between continuation requests if necessary.
 - **Streaming checkpoints:** save received text during long requests. Stop without discarding the draft.
+- **Local token estimates:** current memory, drafts (including streaming), and archived versions display an approximate text token count alongside words and characters. No API request or tokenizer download; actual counts depend on the model. API-reported output usage, when available, is separate.
 - **Compact, theme-native interface:** collapsible micro-preset settings, manual generation controls, and memory injection settings.
 
 ## Install
@@ -38,7 +39,7 @@ Use **Test** to send a small connectivity check without chat history. Select the
 
 ## Generate and resume
 
-1. Set **Summary Prompt** to the desired Memory Book structure and instructions. A generic default is included; no private or character-specific template is distributed.
+1. Set **Summary Prompt** to the desired Memory Book structure and instructions. No summary prompt or skeleton is bundled. On a fresh installation without imported settings, the field is empty; paste your own instructions before generating. Existing locally saved prompts and imported Summarize prompts are preserved. The clear-prompt control only clears the current setting; existing Memory Books and frozen draft snapshots are unaffected.
 2. Click **Summarize now**. The source and prompt are snapshotted before generation. The current memory is kept active.
 3. If the generation stops early, click **Continue from cutoff**. This uses the same source snapshot and skeleton, with the complete existing draft and a suffix-only instruction. It also works after an apparently normal finish if content is missing. Review or edit the result; the model may repeat or omit material, and only exact overlap is removed automatically.
 4. **Stop & keep draft** cancels the request and keeps received text. Streaming checkpoints are saved roughly every 12 seconds as data arrives. Text never received or not yet saved before an unexpected tab closure cannot be recovered.
